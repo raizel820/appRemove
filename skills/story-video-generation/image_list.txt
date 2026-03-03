@@ -1,0 +1,12 @@
+file '/Users/huangshuang/images/scene_001.png'
+duration 3.0
+file '/Users/huangshuang/images/scene_002.png'
+duration 3.0
+file '/Users/huangshuang/images/scene_003.png'
+duration 3.0
+file '/Users/huangshuang/images/scene_004.png'
+duration 3.0
+file '/Users/huangshuang/images/scene_005.png'
+duration 3.0
+file '/Users/huangshuang/images/scene_006.png'
+duration 3.0

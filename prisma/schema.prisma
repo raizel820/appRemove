@@ -1,0 +1,1818 @@
+// EURL LA SOURCE - Invoice Management App Schema (Updated)
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// COMPANY SETTINGS (Expanded)
+// ============================================
+model Company {
+  id           String  @id @default(cuid())
+  name         String
+  address      String?
+  phoneNumbers String? // JSON array of phone numbers
+  faxNumbers   String? // JSON array of fax numbers
+  emails       String? // JSON array of emails
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Deprecated: Use activeCompanyProfile instead
+  // French identifiers (kept for backward compatibility)
+  nif      String? // Numéro d'Identification Fiscale (VAT number)
+  nis      String? // Numéro d'Identification Statistique (corporate number)
+  rib      String? // Relevé d'Identité Bancaire (bank account)
+  rcn      String? // Registre du Commerce et des Sociétés (trade register)
+  bankName String? // Bank name
+
+  // Additional identifiers (kept for backward compatibility)
+  fundCapital Float? // Capital de fond (share capital)
+
+  // Activity descriptions for header template
+  activityDescriptionAr String? // Activity description in Arabic
+  activityDescriptionFr String? // Activity description in French
+
+  // Logo
+  activeLogoId        String? // ID of the active/default logo
+  logos               CompanyLogo[] // All uploaded logos for this company
+  currency            String        @default("EUR")
+  defaultLanguage     String        @default("en") // en, ar, fr
+
+  // Multiple Activity Profiles
+  activeProfileId     String? // ID of the currently active profile
+  activityProfiles    CompanyProfile[]
+}
+
+// ============================================
+// COMPANY PROFILES (Multiple profiles for different activities)
+// ============================================
+model CompanyProfile {
+  id        String   @id @default(cuid())
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  // Profile Number (user-defined, e.g., 1, 2, 3, etc.)
+  profileNumber Int    @default(1)
+
+  // Profile Name (e.g., "Manufacturing", "Trading", "Services")
+  profileName  String
+
+  // Business Identifiers (French)
+  nif          String? // Numéro d'Identification Fiscale (VAT number)
+  nis          String? // Numéro d'Identification Statistique (corporate number)
+  rcn          String? // Registre du Commerce et des Sociétés (trade register)
+
+  // Financial Information
+  rib          String? // Relevé d'Identité Bancaire (bank account)
+  bankName     String? // Bank name
+  fundCapital  Float?  // Capital de fond (share capital)
+
+  isActive     Boolean  @default(false) // Whether this is the active profile
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([companyId, profileNumber])
+  @@index([companyId])
+  @@index([companyId, isActive])
+}
+
+// ============================================
+// COMPANY LOGOS (Multiple logos per company)
+// ============================================
+model CompanyLogo {
+  id           String   @id @default(cuid())
+  companyId    String
+  company      Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  filename     String // Stored filename in public folder
+  originalName String // Original uploaded filename
+  fileType     String // e.g., image/jpeg, image/png
+  fileSize     Int // File size in bytes
+  isActive     Boolean  @default(false) // Whether this is the active/default logo
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([companyId, isActive])
+}
+
+// ============================================
+// CUSTOMERS (Expanded with French fields)
+// ============================================
+model Customer {
+  id        String @id @default(cuid())
+  code      String @unique // Customer short code for file naming
+  fullName  String // Full name for display and folder naming
+  shortName String // Short name for file naming
+
+  // Contact Information
+  address String?
+  city    String?
+  country String?
+  phone   String?
+  email   String?
+
+  // Business Identifiers
+  nif String? // Numéro d'Identification Fiscale (VAT number)
+  nis String? // Numéro d'Identification Statistique (corporate number)
+  rib String? // Relevé d'Identité Bancaire (bank account)
+  rcn String? // Registre du Commerce et des Sociétés (trade register)
+
+  // Additional
+  notes String?
+
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  orders    Order[]
+  auditLogs AuditLog[]
+
+  @@index([deletedAt])
+  @@index([fullName])
+  @@index([nif])
+  @@index([nis])
+  @@index([rib])
+  @@index([rcn])
+}
+
+// ============================================
+// MACHINE SPECIFICATIONS (Reusable templates)
+// ============================================
+model SpecTemplate {
+  id          String  @id @default(cuid())
+  name        String  @unique // e.g., "Standard", "Heavy Duty", "Custom"
+  description String?
+  category    String // e.g., "Capacity", "Power", "Dimensions", "Materials"
+  fields      String // JSON array of available fields
+  isActive    Boolean @default(true) // Template can be disabled
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  machineModels MachineModel[]
+}
+
+// ============================================
+// SPECIFICATION DEFINITIONS (Individual specs with translations)
+// ============================================
+model SpecDefinition {
+  id          String  @id @default(cuid())
+  code        String  @unique // e.g., "RPM", "VOLTAGE", "CAPACITY"
+  type        String  @default("text") // text, number, boolean, select
+  unit        String? // e.g., "rpm", "V", "kg", "mm"
+
+  // Translations in three languages
+  labelFr     String? // French label
+  labelEn     String? // English label
+  labelAr     String? // Arabic label
+  descriptionFr String? // French description
+  descriptionEn String? // English description
+  descriptionAr String? // Arabic description
+
+  // Category for organization
+  category    String? // e.g., "mechanical", "electrical", "physical"
+
+  // Options for select type (JSON array)
+  options     String? // JSON: ["Option 1", "Option 2", "Option 3"]
+
+  // Validation rules
+  required    Boolean @default(false)
+  minValue    Float?
+  maxValue    Float?
+  pattern     String? // Regex pattern for validation
+
+  // Status
+  isActive    Boolean @default(true)
+  sortOrder   Int      @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  modelSpecs ModelSpec[]
+
+  @@index([category])
+  @@index([isActive])
+  @@index([sortOrder])
+}
+
+// ============================================
+// MODEL SPECS (Selected specs with values for each model)
+// ============================================
+model ModelSpec {
+  id               String  @id @default(cuid())
+  modelId          String
+  specDefinitionId String
+  value            String? // Stored as string, can be number, boolean, or text
+  sortOrder        Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  model           MachineModel     @relation(fields: [modelId], references: [id], onDelete: Cascade)
+  specDefinition  SpecDefinition   @relation(fields: [specDefinitionId], references: [id], onDelete: Cascade)
+
+  @@unique([modelId, specDefinitionId])
+  @@index([modelId])
+  @@index([specDefinitionId])
+  @@index([sortOrder])
+}
+
+// ============================================
+// MACHINE FAMILIES (Categories)
+// ============================================
+model MachineFamily {
+  id          String  @id @default(cuid())
+  name        String
+  description String?
+  code        String  @unique // Family code (e.g., MZ)
+  modelSpecs  Boolean @default(false) // Does this family use model specs templates?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  models MachineModel[]
+}
+
+// ============================================
+// MACHINE MODELS (Products)
+// ============================================
+model MachineModel {
+  id             String  @id @default(cuid())
+  familyId       String
+  name           String
+  code           String  @unique // Model code (e.g., MZ100)
+  description    String?
+  basePrice      Float?
+  currency       String  @default("EUR") // Model price currency
+  specifications String? // JSON string of key-value specs (deprecated - use modelSpecTemplates)
+  specTemplateId String? // Reference to reusable spec template
+
+  // New structured spec fields (JSON). Nullable.
+  // Use Prisma Json to store structured mechanical / electrical / physical specs
+  mechanicalSpecs Json? // e.g. {ram: "x", speed: "y", bearings: {type: "..."}}
+  electricalSpecs Json? // e.g. {voltage: "400V", current: "10A", power: "2kW"}
+  physicalSpecs   Json? // e.g. {weightKg: 120, dimensions: {w: 800, h: 1200, d: 600}}
+
+  // Manufacturing settings
+  isManufactured Boolean @default(true) // true = generates serials, false = imported
+
+  // Additional
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  family       MachineFamily @relation(fields: [familyId], references: [id])
+  specTemplate SpecTemplate? @relation(fields: [specTemplateId], references: [id])
+  modelSpecs   ModelSpec[]
+  orderItems   OrderItem[]
+
+  @@index([familyId])
+}
+
+// ============================================
+// ORDER NUMBER STATES
+// ============================================
+enum OrderNumberState {
+  USED // Number currently assigned to an active order
+  RESERVED // Temporarily claimed for in-progress order/draft
+  REUSABLE // Previously used and explicitly marked as reusable
+  BLOCKED // Previously used and marked non-reusable
+}
+
+// ============================================
+// ORDER NUMBERS (Authoritative ledger of all order numbers)
+// ============================================
+model OrderNumber {
+  number     Int              @unique // The actual order number (e.g., 1, 2, 3, ...)
+  state      OrderNumberState @default(RESERVED)
+  reservedBy String? // Draft order ID or session token holding this reservation
+  reservedAt DateTime? // When the number was reserved
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+  notes      String? // Optional: origin info (e.g., original order id)
+
+  // Relations
+  orders Order[] // All orders that have used this number
+
+  @@index([state])
+  @@index([reservedBy])
+  @@index([reservedAt])
+}
+
+// ============================================
+// ORDER NUMBERS (Year-based numbering ledger)
+// ============================================
+model OrderNumbers {
+  id         String           @id @default(cuid())
+  year       Int // 2025, 2026, etc.
+  seq        Int // Sequence within the year (1, 2, 3, ...)
+  state      OrderNumberState @default(RESERVED) // RESERVED, USED, REUSABLE, BLOCKED
+  reservedBy String? // Draft order ID or session token
+  reservedAt DateTime? // When this number was reserved
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+
+  @@unique([year, seq])
+  @@index([state])
+  @@index([reservedBy])
+  @@index([reservedAt])
+  @@index([year, state])
+}
+
+// ============================================
+// INVOICE NUMBERS (Year-based numbering ledger - independent from orders)
+// ============================================
+model InvoiceNumbers {
+  id         String           @id @default(cuid())
+  year       Int // 2025, 2026, etc.
+  seq        Int // Sequence within the year (1, 2, 3, ...)
+  state      OrderNumberState @default(RESERVED) // RESERVED, USED, REUSABLE, BLOCKED
+  reservedBy String? // Draft invoice ID or session token
+  reservedAt DateTime? // When this number was reserved
+  orderId    String? // Optional link to order when finalized
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+
+  @@unique([year, seq])
+  @@index([state])
+  @@index([reservedBy])
+  @@index([reservedAt])
+  @@index([year, state])
+  @@index([orderId])
+}
+
+// ============================================
+// PROFORMA NUMBERS (Year-based numbering ledger - independent from orders)
+// ============================================
+model ProformaNumbers {
+  id         String           @id @default(cuid())
+  year       Int // 2025, 2026, etc.
+  seq        Int // Sequence within the year (1, 2, 3, ...)
+  state      OrderNumberState @default(RESERVED) // RESERVED, USED, REUSABLE, BLOCKED
+  reservedBy String? // Draft proforma ID or session token
+  reservedAt DateTime? // When this number was reserved
+  orderId    String? // Optional link to order when finalized
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+
+  @@unique([year, seq])
+  @@index([state])
+  @@index([reservedBy])
+  @@index([reservedAt])
+  @@index([year, state])
+  @@index([orderId])
+}
+
+// ============================================
+// PURCHASE ORDER NUMBERS (Year-based numbering ledger - independent from orders)
+// ============================================
+model PurchaseOrderNumbers {
+  id         String           @id @default(cuid())
+  year       Int // 2025, 2026, etc.
+  seq        Int // Sequence within the year (1, 2, 3, ...)
+  state      OrderNumberState @default(RESERVED) // RESERVED, USED, REUSABLE, BLOCKED
+  reservedBy String? // Draft purchase order ID or session token
+  reservedAt DateTime? // When this number was reserved
+  orderId    String? // Optional link to order when finalized
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+
+  @@unique([year, seq])
+  @@index([state])
+  @@index([reservedBy])
+  @@index([reservedAt])
+  @@index([year, state])
+  @@index([orderId])
+}
+
+// ============================================
+// DELIVERY NUMBERS (Year-based numbering ledger - independent from orders)
+// ============================================
+model DeliveryNumbers {
+  id         String           @id @default(cuid())
+  year       Int // 2025, 2026, etc.
+  seq        Int // Sequence within the year (1, 2, 3, ...)
+  state      OrderNumberState @default(RESERVED) // RESERVED, USED, REUSABLE, BLOCKED
+  reservedBy String? // Draft delivery note ID or session token
+  reservedAt DateTime? // When this number was reserved
+  orderId    String? // Optional link to order when finalized
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+
+  @@unique([year, seq])
+  @@index([state])
+  @@index([reservedBy])
+  @@index([reservedAt])
+  @@index([year, state])
+  @@index([orderId])
+}
+
+// ============================================
+// DOCUMENT SPLITS (for splitting documents within an order)
+// ============================================
+model DocumentSplit {
+  id            String   @id @default(cuid())
+  orderId       String
+  documentType  String   // 'invoice', 'proforma', 'purchase-order', 'delivery-note'
+  splitIndex    Int      // 0, 1, 2, ...
+  itemIds       String   // JSON array of item IDs
+  number        String?  // The document number for this split (e.g., "INV-001/2026")
+  sequence      Int?     // Sequence number for this split
+  year          Int?     // Year for this split
+  date          DateTime? // Date for this split
+  status        String   @default("DRAFT") // DRAFT, RESERVED, ISSUED
+  verificationToken String? // Verification token for this split
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  order         Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@unique([orderId, documentType, splitIndex])
+  @@index([orderId])
+  @@index([orderId, documentType])
+}
+
+// ============================================
+// ORDER TYPES
+// ============================================
+enum OrderType {
+  INVOICE
+  PROFORMA
+  DELIVERY_NOTE
+  PURCHASE_ORDER
+}
+
+// ============================================
+// ORDER STATUS
+// ============================================
+enum OrderStatus {
+  DRAFT
+  SENT
+  PAID
+  DELAYED
+  CANCELLED
+  PARTIALLY_PAID
+  ACTIVE_ORDER
+}
+
+// ============================================
+// ORDER ITEMS (machines/products in an order)
+// ============================================
+model OrderItem {
+  id             String  @id @default(cuid())
+  orderId        String
+  modelId        String?
+  description    String
+  quantity       Int     @default(1)
+  unitPrice      Float
+  discount       Float   @default(0)
+  totalPrice     Float
+  serialNumbers  String? // JSON array of serial numbers for this item
+  specifications String? // JSON specs specific to this order item (overrides model specs)
+
+  // Customization
+  isCustomized         Boolean @default(false) // Custom configuration
+  customizationVersion Int? // v1, v2, etc.
+
+  // Snapshot fields for machine model (stored at order creation)
+  snapshotModel String? // JSON: Machine model data snapshot (name, code, family, isManufactured, etc.)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  order Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  model MachineModel? @relation(fields: [modelId], references: [id])
+
+  @@index([orderId])
+  @@index([modelId])
+}
+
+// ============================================
+// SERIAL NUMBER COUNTER (for generating serial numbers)
+// ============================================
+model SerialNumberCounter {
+  id          String   @id @default(cuid())
+  year        Int      @unique // 2026
+  lastCounter Int      @default(0) // Last used number
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ============================================
+// AUDIT LOG
+// ============================================
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  RESTORE
+  PDF_GENERATED
+  EMAIL_SENT
+}
+
+model AuditLog {
+  id         String      @id @default(cuid())
+  entityType String // Customer, Order, etc.
+  entityId   String
+  action     AuditAction
+  userId     String? // Future: for multi-user
+  changes    String? // JSON string of changes
+  metadata   String? // JSON string of additional info
+  customerId String?
+  orderId    String?
+  createdAt  DateTime    @default(now())
+
+  customer Customer? @relation(fields: [customerId], references: [id])
+  order    Order?    @relation(fields: [orderId], references: [id])
+
+  @@index([entityType, entityId])
+  @@index([customerId])
+  @@index([orderId])
+  @@index([createdAt])
+}
+
+// ============================================
+// FTS5 VIRTUAL TABLES (for global search)
+// ============================================
+model CustomerSearch {
+  id         String   @id @default(cuid())
+  customerId String
+  fullName   String
+  shortName  String
+  email      String
+  phone      String
+  nif        String?
+  nis        String?
+  rib        String?
+  rcn        String?
+  city       String?
+  createdAt  DateTime @default(now())
+
+  @@index([fullName])
+  @@index([shortName])
+  @@index([email])
+  @@index([phone])
+  @@index([nif])
+  @@index([nis])
+  @@index([rib])
+  @@index([rcn])
+}
+
+model OrderSearch {
+  id           String   @id @default(cuid())
+  orderId      String
+  type         String
+  fullNumber   String
+  customerName String
+  notes        String?
+  status       String
+  total        Float
+  currency     String
+  date         DateTime
+  createdAt    DateTime @default(now())
+
+  @@index([fullNumber])
+  @@index([customerName])
+  @@index([status])
+  @@index([type])
+}
+
+model SerialSearch {
+  id           String   @id @default(cuid())
+  orderItemId  String
+  serialNumber String
+  orderId      String
+  description  String?
+  createdAt    DateTime @default(now())
+
+  @@index([serialNumber])
+  @@index([orderId])
+}
+
+// ============================================
+// PDF CONFIGURATION
+// ============================================
+
+enum PDFFontFamily {
+  HELVETICA
+  TIMES_ROMAN
+  COURIER
+  ARIAL
+}
+
+enum PDFDescriptionLanguage {
+  FRENCH
+  ENGLISH
+}
+
+model PDFConfiguration {
+  id String @id @default(cuid())
+
+  // Global Header Settings
+  // Language for French/English description
+  descriptionLanguage PDFDescriptionLanguage @default(ENGLISH)
+
+  // Toggle which document types use this header
+  useInInvoice       Boolean @default(true)
+  useInProforma      Boolean @default(true)
+  useInDeliveryNote  Boolean @default(true)
+  useInPurchaseOrder Boolean @default(true)
+  useInNameplate     Boolean @default(false)
+  useInTechnicalFile Boolean @default(true)
+
+  // Company profile fields to include (JSON)
+  // These fields apply to both Arabic and French/English sides
+  selectedCompanyFields String @default("{}")
+
+  // Toggle which company info to include
+  includeTelephone     Boolean @default(true)
+  includeFax           Boolean @default(true)
+  includeAddress       Boolean @default(true)
+  includeEmail         Boolean @default(true)
+  includeRcn           Boolean @default(true) // Trade register number
+  includeNif           Boolean @default(true) // Tax identification number
+  includeNis           Boolean @default(true) // Statistical number
+  includeRib           Boolean @default(true) // Bank account number
+  includeBankName      Boolean @default(true) // Bank agency
+  includeCapitalSocial Boolean @default(true) // Capital social
+
+  // Toggle which activity descriptions to include in header
+  includeArabicDescription Boolean @default(true) // Show Arabic description
+  includeFrenchDescription Boolean @default(true) // Show French description
+
+  // Writing direction for each part (applies to entire column)
+  leftPartDirection  String @default("LTR") // LTR or RTL for French/English column
+  rightPartDirection String @default("RTL") // LTR or RTL for Arabic column
+
+  // Global line spacing (for header fields)
+  headerLineSpacing Float @default(1)
+
+  // Company name styling
+  companyNameFontFamily  PDFFontFamily @default(HELVETICA)
+  companyNameFontSize    Int           @default(24)
+  companyNameTextColor   String        @default("#000000")
+  companyNameLineSpacing Float         @default(1)
+
+  // Company description styling
+  descriptionFontFamily  PDFFontFamily @default(HELVETICA)
+  descriptionFontSize    Int           @default(12)
+  descriptionTextColor   String        @default("#000000")
+  descriptionLineSpacing Float         @default(1)
+
+  // Logo settings
+  logoScaling Float @default(1.5) // Scale factor (1.0 = 100%)
+  logoOffsetX Int   @default(0) // Horizontal offset in pixels (negative = left, positive = right)
+  logoOffsetY Int   @default(25) // Vertical offset in pixels (negative = up, positive = down)
+
+  // Label font settings (for "Telephone:", "Fax:", etc.)
+  labelFontFamily  PDFFontFamily @default(HELVETICA)
+  labelFontSize    Int           @default(12)
+  labelTextColor   String        @default("#000000")
+  labelLineSpacing Float         @default(0.5)
+
+  // Data font settings (for actual values like phone numbers, addresses)
+  dataFontFamily  PDFFontFamily @default(HELVETICA)
+  dataFontSize    Int           @default(12)
+  dataTextColor   String        @default("#000000")
+  dataLineSpacing Float         @default(0.5)
+
+  // =====================
+  // INVOICE SETTINGS
+  // =====================
+
+  // Invoice Top Body Part (Title, Client Info, Date)
+  invoiceTopBodyDirection String @default("LTR") // LTR or RTL for top body section
+
+  // Title settings
+  invoiceTitlePosition      String        @default("center") // left, center, right
+  invoiceTitleFontFamily    PDFFontFamily @default(HELVETICA)
+  invoiceTitleFontSize      Int           @default(16)
+  invoiceTitleTextColor     String        @default("#000000")
+  invoiceTitleLineSpacing   Float         @default(0.5)
+  invoiceTitleLetterSpacing Float         @default(0.0)
+  invoiceTitleBold          Boolean       @default(true)
+  invoiceTitleUnderline     Boolean       @default(false)
+
+  // Customer info settings
+  // Customer info position
+  invoiceClientInfoPosition       String        @default("left") // left, center, right
+  invoiceClientLabelText          String        @default("Client")
+  // Customer info settings - Label
+  invoiceClientLabelFontFamily    PDFFontFamily @default(HELVETICA)
+  invoiceClientLabelFontSize      Int           @default(12)
+  invoiceClientLabelTextColor     String        @default("#000000")
+  invoiceClientLabelLineSpacing   Float         @default(0.5)
+  invoiceClientLabelLetterSpacing Float         @default(0.0)
+  invoiceClientLabelBold          Boolean       @default(true)
+  invoiceClientLabelUnderline     Boolean       @default(false)
+
+  // Customer info settings - Value
+  invoiceClientValueFontFamily    PDFFontFamily @default(HELVETICA)
+  invoiceClientValueFontSize      Int           @default(12)
+  invoiceClientValueTextColor     String        @default("#000000")
+  invoiceClientValueLineSpacing   Float         @default(0.5)
+  invoiceClientValueLetterSpacing Float         @default(0.0)
+  invoiceClientValueBold          Boolean       @default(false)
+  invoiceClientValueUnderline     Boolean       @default(false)
+
+  // Date/location settings
+  invoiceDatePosition          String        @default("right") // left, center, right
+  invoiceLocationDateLabelText String        @default("M'sila le") // Configurable label
+  invoiceDateFontFamily        PDFFontFamily @default(HELVETICA)
+  invoiceDateFontSize          Int           @default(12)
+  invoiceDateTextColor         String        @default("#000000")
+  invoiceDateLineSpacing       Float         @default(0.5)
+  invoiceDateLetterSpacing     Float         @default(0.0)
+  invoiceDateBold              Boolean       @default(false)
+  invoiceDateUnderline         Boolean       @default(false)
+
+  // Invoice Items Table
+  invoiceTableTextAlignment String @default("left") // left, center, right
+  invoiceTableDirection     String @default("LTR") // LTR or RTL for items table
+
+  // Table labels (header row) settings
+  invoiceTableLabelFontFamily    PDFFontFamily @default(HELVETICA)
+  invoiceTableLabelFontSize      Int           @default(11)
+  invoiceTableLabelTextColor     String        @default("#000000")
+  invoiceTableLabelLineSpacing   Float         @default(1)
+  invoiceTableLabelLetterSpacing Float         @default(0.0)
+  invoiceTableLabelBold          Boolean       @default(true)
+  invoiceTableLabelUnderline     Boolean       @default(false)
+
+  // Table values (rest of table) settings
+  invoiceTableValueFontFamily    PDFFontFamily @default(HELVETICA)
+  invoiceTableValueFontSize      Int           @default(11)
+  invoiceTableValueTextColor     String        @default("#000000")
+  invoiceTableValueLineSpacing   Float         @default(1)
+  invoiceTableValueLetterSpacing Float         @default(0.0)
+  invoiceTableValueBold          Boolean       @default(false)
+  invoiceTableValueUnderline     Boolean       @default(false)
+
+  invoiceEmptyRows Int @default(8) // Number of empty rows to show
+
+  // Items Table Max Height Settings
+  invoiceSinglePageTableMaxHeight Int @default(297) // Max height of items table on single page (mm) - no height limit
+  invoiceLastPageTableMaxHeight   Int @default(150) // Max height of items table on last page (mm) - page with summary + terms
+  invoiceOtherPagesTableMaxHeight Int @default(180) // Max height of items table on other pages (mm) - pages without summary + terms
+  invoiceFirstPageTableMaxHeight  Int @default(180) // Max height of items table on first page (mm) - with header and customer info
+
+  // Column-specific settings for items table
+  // Column 1: N° (Number)
+  invoiceColNumberWidth   Float @default(5) // Column width in mm
+  invoiceColNumberPadding Float @default(2) // Cell padding in mm
+
+  // Column 2: Item family
+  invoiceColFamilyWidth   Float @default(39.69) // Column width in mm (150px)
+  invoiceColFamilyPadding Float @default(5.61) // Cell padding in mm (2.12mm * 2.65)
+
+  // Column 3: Model
+  invoiceColModelWidth   Float @default(39.69) // Column width in mm (150px)
+  invoiceColModelPadding Float @default(5.61) // Cell padding in mm (2.12mm * 2.65)
+
+  // Column 4: Brand
+  invoiceColBrandWidth   Float @default(20) // Column width in mm
+  invoiceColBrandPadding Float @default(5.61) // Cell padding in mm (2.12mm * 2.65)
+
+  // Column 5: Quantity
+  invoiceColQuantityWidth   Float @default(21.17) // Column width in mm (80px)
+  invoiceColQuantityPadding Float @default(5.61) // Cell padding in mm (2.12mm * 2.65)
+
+  // Column 6: Price per unit
+  invoiceColPriceUnitWidth   Float @default(31.75) // Column width in mm (120px)
+  invoiceColPriceUnitPadding Float @default(5.61) // Cell padding in mm (2.12mm * 2.65)
+
+  // Column 7: Price excluding tax
+  invoiceColPriceTotalWidth   Float @default(31.75) // Column width in mm (120px)
+  invoiceColPriceTotalPadding Float @default(5.61) // Cell padding in mm (2.12mm * 2.65)
+
+  // Invoice Totals Section (uses same fonts as table values)
+
+  // Invoice Footer (Terms & Conditions)
+  invoiceTermsPosition      String        @default("left") // left, center, right
+  invoiceTermsTitle         String        @default("") // Configurable title
+  invoiceTermsFontFamily    PDFFontFamily @default(HELVETICA)
+  invoiceTermsFontSize      Int           @default(11)
+  invoiceTermsTextColor     String        @default("#000000")
+  invoiceTermsLineSpacing   Float         @default(0.5)
+  invoiceTermsLetterSpacing Float         @default(0.0)
+  invoiceTermsBold          Boolean       @default(false)
+  invoiceTermsUnderline     Boolean       @default(false)
+
+  // Individual Terms Settings
+  invoiceTermsIncludeDelivery  Boolean @default(true) // Include delivery term
+  invoiceTermsDeliveryType     String  @default("range") // "fixed" or "range"
+  invoiceTermsDeliveryTimeFrom Int     @default(1) // For range: minimum time
+  invoiceTermsDeliveryTimeTo   Int? // For range: maximum time (null if fixed)
+  invoiceTermsDeliveryTimeUnit String  @default("months") // "days", "weeks", "months", "years"
+
+  invoiceTermsIncludeValidity  Boolean @default(true) // Include validity term
+  invoiceTermsValidityType     String  @default("fixed") // "fixed" or "range"
+  invoiceTermsValidityTime     Int     @default(3) // Time value
+  invoiceTermsValidityTimeTo   Int? // For range: maximum time (null if fixed)
+  invoiceTermsValidityTimeUnit String  @default("months") // "days", "weeks", "months", "years"
+
+  invoiceTermsIncludeWarranty  Boolean @default(true) // Include warranty term
+  invoiceTermsWarrantyType     String  @default("fixed") // "fixed" or "range"
+  invoiceTermsWarrantyTime     Int     @default(12) // Time value
+  invoiceTermsWarrantyTimeTo   Int? // For range: maximum time (null if fixed)
+  invoiceTermsWarrantyTimeUnit String  @default("months") // "days", "weeks", "months", "years"
+
+  invoiceTermsIncludeConfirmation Boolean @default(false) // Include delivery confirmation term
+  invoiceTermsDeliveryCondition   String  @default("after_order_confirmation") // "after_order_confirmation" or "after_payment"
+
+  invoiceTermsIncludePayment      Boolean @default(true) // Include payment method term
+  invoiceTermsPaymentMethod       String  @default("split_payment") // "online", "website", "check", "cash", "split_payment"
+  invoiceTermsSplitPaymentPercent Int     @default(50) // Percentage to pay at order (for split payment)
+  invoiceTermsIncludePriceInWords Boolean @default(true) // Include total price in words
+
+  // Signature labels (position is fixed at bottom, before page number)
+  invoiceSignatureLeftLabelText  String @default("Manager") // Configurable left signature label
+  invoiceSignatureRightLabelText String @default("Client") // Configurable right signature label
+
+  // Signature configuration
+  invoiceSignatureCount     Int    @default(2) // Number of signatures to show (1 or 2)
+  invoiceSignaturePosition  String @default("right") // Position of single signature on page (right, left, middle)
+  invoiceSignatureLineWidth Int    @default(150) // Width of signature line above label in pixels
+  savedSignatureLabels      String @default("[]") // JSON array of saved signature labels with translations
+
+  // Individual signature controls
+  includeLeftSignature Boolean @default(true) // Show left signature
+  leftSignatureOffsetX Int     @default(0) // Horizontal offset in pixels (positive = right, negative = left)
+  leftSignatureOffsetY Int     @default(0) // Vertical offset in pixels (positive = up, negative = down)
+
+  includeRightSignature Boolean @default(true) // Show right signature
+  rightSignatureOffsetX Int     @default(0) // Horizontal offset in pixels (positive = right, negative = left)
+  rightSignatureOffsetY Int     @default(0) // Vertical offset in pixels (positive = up, negative = down)
+
+  // Page number (dynamic, fixed at bottom center)
+  invoicePageNumberingText    String        @default("Page 1 sur 1") // Configurable page numbering format
+  invoicePageNumberFontFamily PDFFontFamily @default(HELVETICA)
+  invoicePageNumberFontSize   Int           @default(10)
+  invoicePageNumberTextColor  String        @default("#666")
+  invoicePageNumberPosition   String        @default("center")
+  invoicePageNumberOffsetX    Int           @default(0)
+  invoicePageNumberOffsetY    Int           @default(0)
+
+  // QR Code settings
+  includeQrCode Boolean @default(false) // Show QR code placeholder
+  qrCodeSize    Int     @default(50) // Size of QR code in pixels
+  qrCodeOffsetX Int     @default(0) // Horizontal offset in pixels (positive = right, negative = left)
+  qrCodeOffsetY Int     @default(0) // Vertical offset in pixels (positive = up, negative = down)
+
+  // Invoice currency and language
+  invoiceCurrency String @default("DZD") // Currency for invoice display (DZD, EUR, USD, etc.)
+  invoiceLanguage String @default("FR") // Language for invoice content (FR, EN, AR)
+
+  // =====================
+  // PROFORMA SETTINGS
+  // =====================
+
+  // Proforma Top Body Part (Title, Client Info, Date)
+  proformaTopBodyDirection String @default("LTR") // LTR or RTL for top body section
+
+  // Title settings
+  proformaTitlePosition      String        @default("center") // left, center, right
+  proformaTitleFontFamily    PDFFontFamily @default(HELVETICA)
+  proformaTitleFontSize      Int           @default(16)
+  proformaTitleTextColor     String        @default("#000000")
+  proformaTitleLineSpacing   Float         @default(0.5)
+  proformaTitleLetterSpacing Float         @default(0.0)
+  proformaTitleBold          Boolean       @default(true)
+  proformaTitleUnderline     Boolean       @default(false)
+
+  // Customer info settings
+  proformaClientInfoPosition       String        @default("left") // left, center, right
+  proformaClientLabelText          String        @default("Client")
+  // Customer info settings - Label
+  proformaClientLabelFontFamily    PDFFontFamily @default(HELVETICA)
+  proformaClientLabelFontSize      Int           @default(12)
+  proformaClientLabelTextColor     String        @default("#000000")
+  proformaClientLabelLineSpacing   Float         @default(0.5)
+  proformaClientLabelLetterSpacing Float         @default(0.0)
+  proformaClientLabelBold          Boolean       @default(true)
+  proformaClientLabelUnderline     Boolean       @default(false)
+
+  // Customer info settings - Value
+  proformaClientValueFontFamily    PDFFontFamily @default(HELVETICA)
+  proformaClientValueFontSize      Int           @default(12)
+  proformaClientValueTextColor     String        @default("#000000")
+  proformaClientValueLineSpacing   Float         @default(0.5)
+  proformaClientValueLetterSpacing Float         @default(0.0)
+  proformaClientValueBold          Boolean       @default(false)
+  proformaClientValueUnderline     Boolean       @default(false)
+
+  // Date/location settings
+  proformaDatePosition          String        @default("right") // left, center, right
+  proformaLocationDateLabelText String        @default("M'sila le") // Configurable label
+  proformaDateFontFamily        PDFFontFamily @default(HELVETICA)
+  proformaDateFontSize          Int           @default(12)
+  proformaDateTextColor         String        @default("#000000")
+  proformaDateLineSpacing       Float         @default(0.5)
+  proformaDateLetterSpacing     Float         @default(0.0)
+  proformaDateBold              Boolean       @default(false)
+  proformaDateUnderline         Boolean       @default(false)
+
+  // Proforma Items Table
+  proformaTableTextAlignment String @default("left") // left, center, right
+  proformaTableDirection     String @default("LTR") // LTR or RTL for items table
+
+  // Table labels (header row) settings
+  proformaTableLabelFontFamily    PDFFontFamily @default(HELVETICA)
+  proformaTableLabelFontSize      Int           @default(11)
+  proformaTableLabelTextColor     String        @default("#000000")
+  proformaTableLabelLineSpacing   Float         @default(1)
+  proformaTableLabelLetterSpacing Float         @default(0.0)
+  proformaTableLabelBold          Boolean       @default(true)
+  proformaTableLabelUnderline     Boolean       @default(false)
+
+  // Table values (rest of table) settings
+  proformaTableValueFontFamily    PDFFontFamily @default(HELVETICA)
+  proformaTableValueFontSize      Int           @default(11)
+  proformaTableValueTextColor     String        @default("#000000")
+  proformaTableValueLineSpacing   Float         @default(1)
+  proformaTableValueLetterSpacing Float         @default(0.0)
+  proformaTableValueBold          Boolean       @default(false)
+  proformaTableValueUnderline     Boolean       @default(false)
+
+  proformaEmptyRows Int @default(8) // Number of empty rows to show
+
+  // Items Table Max Height Settings
+  proformaSinglePageTableMaxHeight Int @default(297) // Max height of items table on single page (mm)
+  proformaLastPageTableMaxHeight   Int @default(150) // Max height of items table on last page (mm)
+  proformaOtherPagesTableMaxHeight Int @default(180) // Max height of items table on other pages (mm)
+  proformaFirstPageTableMaxHeight  Int @default(180) // Max height of items table on first page (mm) - with header and customer info
+
+  // Column-specific settings for items table
+  proformaColNumberWidth   Float @default(5) // Column width in mm
+  proformaColNumberPadding Float @default(2) // Cell padding in mm
+
+  proformaColFamilyWidth   Float @default(39.69) // Column width in mm
+  proformaColFamilyPadding Float @default(5.61) // Cell padding in mm
+
+  proformaColModelWidth   Float @default(39.69) // Column width in mm
+  proformaColModelPadding Float @default(5.61) // Cell padding in mm
+
+  proformaColBrandWidth   Float @default(20) // Column width in mm
+  proformaColBrandPadding Float @default(5.61) // Cell padding in mm
+
+  proformaColQuantityWidth   Float @default(21.17) // Column width in mm
+  proformaColQuantityPadding Float @default(5.61) // Cell padding in mm
+
+  proformaColPriceUnitWidth   Float @default(31.75) // Column width in mm
+  proformaColPriceUnitPadding Float @default(5.61) // Cell padding in mm
+
+  proformaColPriceTotalWidth   Float @default(31.75) // Column width in mm
+  proformaColPriceTotalPadding Float @default(5.61) // Cell padding in mm
+
+  // Proforma Totals Section (uses same fonts as table values)
+
+  // Proforma Footer (Terms & Conditions)
+  proformaTermsPosition      String        @default("left") // left, center, right
+  proformaTermsTitle         String        @default("") // Configurable title
+  proformaTermsFontFamily    PDFFontFamily @default(HELVETICA)
+  proformaTermsFontSize      Int           @default(11)
+  proformaTermsTextColor     String        @default("#000000")
+  proformaTermsLineSpacing   Float         @default(0.5)
+  proformaTermsLetterSpacing Float         @default(0.0)
+  proformaTermsBold          Boolean       @default(false)
+  proformaTermsUnderline     Boolean       @default(false)
+
+  // Individual Terms Settings
+  proformaTermsIncludeDelivery  Boolean @default(true) // Include delivery term
+  proformaTermsDeliveryType     String  @default("range") // "fixed" or "range"
+  proformaTermsDeliveryTimeFrom Int     @default(1) // For range: minimum time
+  proformaTermsDeliveryTimeTo   Int? // For range: maximum time (null if fixed)
+  proformaTermsDeliveryTimeUnit String  @default("months") // "days", "weeks", "months", "years"
+
+  proformaTermsIncludeValidity  Boolean @default(true) // Include validity term
+  proformaTermsValidityType     String  @default("fixed") // "fixed" or "range"
+  proformaTermsValidityTime     Int     @default(3) // Time value
+  proformaTermsValidityTimeTo   Int? // For range: maximum time (null if fixed)
+  proformaTermsValidityTimeUnit String  @default("months") // "days", "weeks", "months", "years"
+
+  proformaTermsIncludeWarranty  Boolean @default(true) // Include warranty term
+  proformaTermsWarrantyType     String  @default("fixed") // "fixed" or "range"
+  proformaTermsWarrantyTime     Int     @default(12) // Time value
+  proformaTermsWarrantyTimeTo   Int? // For range: maximum time (null if fixed)
+  proformaTermsWarrantyTimeUnit String  @default("months") // "days", "weeks", "months", "years"
+
+  proformaTermsIncludeConfirmation Boolean @default(false) // Include delivery confirmation term
+  proformaTermsDeliveryCondition   String  @default("after_order_confirmation") // "after_order_confirmation" or "after_payment"
+
+  proformaTermsIncludePayment      Boolean @default(true) // Include payment method term
+  proformaTermsPaymentMethod       String  @default("split_payment") // "online", "website", "check", "cash", "split_payment"
+  proformaTermsSplitPaymentPercent Int     @default(50) // Percentage to pay at order (for split payment)
+  proformaTermsIncludePriceInWords Boolean @default(true) // Include total price in words
+
+  // Signature labels (position is fixed at bottom, before page number)
+  proformaSignatureLeftLabelText  String @default("Manager") // Configurable left signature label
+  proformaSignatureRightLabelText String @default("Client") // Configurable right signature label
+
+  // Signature configuration
+  proformaSignatureCount     Int    @default(2) // Number of signatures to show (1 or 2)
+  proformaSignaturePosition  String @default("right") // Position of single signature on page (right, left, middle)
+  proformaSignatureLineWidth Int    @default(150) // Width of signature line above label in pixels
+
+  // Individual signature controls
+  proformaIncludeLeftSignature Boolean @default(true) // Show left signature
+  proformaLeftSignatureOffsetX Int     @default(0) // Horizontal offset in pixels (positive = right, negative = left)
+  proformaLeftSignatureOffsetY Int     @default(0) // Vertical offset in pixels (positive = up, negative = down)
+
+  proformaIncludeRightSignature Boolean @default(true) // Show right signature
+  proformaRightSignatureOffsetX Int     @default(0) // Horizontal offset in pixels (positive = right, negative = left)
+  proformaRightSignatureOffsetY Int     @default(0) // Vertical offset in pixels (positive = up, negative = down)
+
+  // Page number (dynamic, fixed at bottom center)
+  proformaPageNumberingText    String        @default("Page 1 sur 1") // Configurable page numbering format
+  proformaPageNumberFontFamily PDFFontFamily @default(HELVETICA)
+  proformaPageNumberFontSize   Int           @default(10)
+  proformaPageNumberTextColor  String        @default("#666")
+  proformaPageNumberPosition   String        @default("center")
+  proformaPageNumberOffsetX    Int           @default(0)
+  proformaPageNumberOffsetY    Int           @default(0)
+
+  // Proforma currency and language
+  proformaCurrency String @default("DZD") // Currency for proforma display (DZD, EUR, USD, etc.)
+  proformaLanguage String @default("FR") // Language for proforma content (FR, EN, AR)
+
+  // =====================
+  // TECHNICAL FILE SETTINGS
+  // =====================
+
+  // Technical File Top Body Part (Title, Client Info, Date)
+  technicalFileTopBodyDirection String @default("LTR") // LTR or RTL for top body section
+
+  // Title settings
+  technicalFileTitlePosition      String        @default("center") // left, center, right
+  technicalFileTitleFontFamily    PDFFontFamily @default(HELVETICA)
+  technicalFileTitleFontSize      Int           @default(16)
+  technicalFileTitleTextColor     String        @default("#000000")
+  technicalFileTitleLineSpacing   Float         @default(0.5)
+  technicalFileTitleLetterSpacing Float         @default(0.0)
+  technicalFileTitleBold          Boolean       @default(true)
+  technicalFileTitleUnderline     Boolean       @default(false)
+
+  // Customer info settings
+  technicalFileClientInfoPosition       String        @default("left") // left, center, right
+  technicalFileClientLabelText          String        @default("Client")
+  // Customer info settings - Label
+  technicalFileClientLabelFontFamily    PDFFontFamily @default(HELVETICA)
+  technicalFileClientLabelFontSize      Int           @default(12)
+  technicalFileClientLabelTextColor     String        @default("#000000")
+  technicalFileClientLabelLineSpacing   Float         @default(0.5)
+  technicalFileClientLabelLetterSpacing Float         @default(0.0)
+  technicalFileClientLabelBold          Boolean       @default(true)
+  technicalFileClientLabelUnderline     Boolean       @default(false)
+
+  // Customer info settings - Value
+  technicalFileClientValueFontFamily    PDFFontFamily @default(HELVETICA)
+  technicalFileClientValueFontSize      Int           @default(12)
+  technicalFileClientValueTextColor     String        @default("#000000")
+  technicalFileClientValueLineSpacing   Float         @default(0.5)
+  technicalFileClientValueLetterSpacing Float         @default(0.0)
+  technicalFileClientValueBold          Boolean       @default(false)
+  technicalFileClientValueUnderline     Boolean       @default(false)
+
+  // Date/location settings
+  technicalFileDatePosition          String        @default("right") // left, center, right
+  technicalFileLocationDateLabelText String        @default("M'sila le") // Configurable label
+  technicalFileDateFontFamily        PDFFontFamily @default(HELVETICA)
+  technicalFileDateFontSize          Int           @default(12)
+  technicalFileDateTextColor         String        @default("#000000")
+  technicalFileDateLineSpacing       Float         @default(0.5)
+  technicalFileDateLetterSpacing     Float         @default(0.0)
+  technicalFileDateBold              Boolean       @default(false)
+  technicalFileDateUnderline         Boolean       @default(false)
+
+  // Technical File Items Table
+  technicalFileTableTextAlignment String @default("left") // left, center, right
+  technicalFileTableDirection     String @default("LTR") // LTR or RTL for items table
+
+  // Table labels (header row) settings
+  technicalFileTableLabelFontFamily    PDFFontFamily @default(HELVETICA)
+  technicalFileTableLabelFontSize      Int           @default(11)
+  technicalFileTableLabelTextColor     String        @default("#000000")
+  technicalFileTableLabelLineSpacing   Float         @default(1)
+  technicalFileTableLabelLetterSpacing Float         @default(0.0)
+  technicalFileTableLabelBold          Boolean       @default(true)
+  technicalFileTableLabelUnderline     Boolean       @default(false)
+
+  // Table values (rest of table) settings
+  technicalFileTableValueFontFamily    PDFFontFamily @default(HELVETICA)
+  technicalFileTableValueFontSize      Int           @default(11)
+  technicalFileTableValueTextColor     String        @default("#000000")
+  technicalFileTableValueLineSpacing   Float         @default(1)
+  technicalFileTableValueLetterSpacing Float         @default(0.0)
+  technicalFileTableValueBold          Boolean       @default(false)
+  technicalFileTableValueUnderline     Boolean       @default(false)
+
+  technicalFileEmptyRows Int @default(8) // Number of empty rows to show
+
+  // Items Table Max Height Settings
+  technicalFileSinglePageTableMaxHeight Int @default(297) // Max height of items table on single page (mm)
+  technicalFileLastPageTableMaxHeight   Int @default(150) // Max height of items table on last page (mm)
+  technicalFileOtherPagesTableMaxHeight Int @default(180) // Max height of items table on other pages (mm)
+  technicalFileFirstPageTableMaxHeight  Int @default(180) // Max height of items table on first page (mm) - with header and customer info
+
+  // Column-specific settings for items table (no number column for technical file)
+  // Column 1: Item family (first column)
+  technicalFileColFamilyWidth   Float @default(52.92) // Column width in mm (200px)
+  technicalFileColFamilyPadding Float @default(5.61) // Cell padding in mm
+
+  // Column 2: Model
+  technicalFileColModelWidth   Float @default(52.92) // Column width in mm (200px)
+  technicalFileColModelPadding Float @default(5.61) // Cell padding in mm
+
+  // Column 3: Brand
+  technicalFileColBrandWidth   Float @default(26.67) // Column width in mm (100px)
+  technicalFileColBrandPadding Float @default(5.61) // Cell padding in mm
+
+  // Column 4: Quantity
+  technicalFileColQuantityWidth   Float @default(26.67) // Column width in mm (100px)
+  technicalFileColQuantityPadding Float @default(5.61) // Cell padding in mm
+
+  // Column 5: Price per unit
+  technicalFileColPriceUnitWidth   Float @default(39.69) // Column width in mm (150px)
+  technicalFileColPriceUnitPadding Float @default(5.61) // Cell padding in mm
+
+  // Column 6: Price total
+  technicalFileColPriceTotalWidth   Float @default(39.69) // Column width in mm (150px)
+  technicalFileColPriceTotalPadding Float @default(5.61) // Cell padding in mm
+
+  // Technical File Totals Section (uses same fonts as table values)
+
+  // Technical File Footer (Terms & Conditions)
+  technicalFileTermsPosition      String        @default("left") // left, center, right
+  technicalFileTermsTitle         String        @default("") // Configurable title
+  technicalFileTermsFontFamily    PDFFontFamily @default(HELVETICA)
+  technicalFileTermsFontSize      Int           @default(11)
+  technicalFileTermsTextColor     String        @default("#000000")
+  technicalFileTermsLineSpacing   Float         @default(0.5)
+  technicalFileTermsLetterSpacing Float         @default(0.0)
+  technicalFileTermsBold          Boolean       @default(false)
+  technicalFileTermsUnderline     Boolean       @default(false)
+
+  // Individual Terms Settings
+  technicalFileTermsIncludeDelivery  Boolean @default(true) // Include delivery term
+  technicalFileTermsDeliveryType     String  @default("range") // "fixed" or "range"
+  technicalFileTermsDeliveryTimeFrom Int     @default(1) // For range: minimum time
+  technicalFileTermsDeliveryTimeTo   Int? // For range: maximum time (null if fixed)
+  technicalFileTermsDeliveryTimeUnit String  @default("months") // "days", "weeks", "months", "years"
+
+  technicalFileTermsIncludeValidity  Boolean @default(true) // Include validity term
+  technicalFileTermsValidityType     String  @default("fixed") // "fixed" or "range"
+  technicalFileTermsValidityTime     Int     @default(3) // Time value
+  technicalFileTermsValidityTimeTo   Int? // For range: maximum time (null if fixed)
+  technicalFileTermsValidityTimeUnit String  @default("months") // "days", "weeks", "months", "years"
+
+  technicalFileTermsIncludeWarranty  Boolean @default(true) // Include warranty term
+  technicalFileTermsWarrantyType     String  @default("fixed") // "fixed" or "range"
+  technicalFileTermsWarrantyTime     Int     @default(12) // Time value
+  technicalFileTermsWarrantyTimeTo   Int? // For range: maximum time (null if fixed)
+  technicalFileTermsWarrantyTimeUnit String  @default("months") // "days", "weeks", "months", "years"
+
+  technicalFileTermsIncludeConfirmation Boolean @default(false) // Include delivery confirmation term
+  technicalFileTermsDeliveryCondition   String  @default("after_order_confirmation") // "after_order_confirmation" or "after_payment"
+
+  technicalFileTermsIncludePayment      Boolean @default(true) // Include payment method term
+  technicalFileTermsPaymentMethod       String @default("split_payment") // "online", "website", "check", "cash", "split_payment"
+  technicalFileTermsSplitPaymentPercent Int     @default(50) // Percentage to pay at order (for split payment)
+  technicalFileTermsIncludePriceInWords Boolean @default(true) // Include total price in words
+
+  // Signature labels (position is fixed at bottom, before page number)
+  technicalFileSignatureLeftLabelText  String @default("Manager") // Configurable left signature label
+  technicalFileSignatureRightLabelText String @default("Client") // Configurable right signature label
+
+  // Signature configuration
+  technicalFileSignatureCount     Int    @default(2) // Number of signatures to show (1 or 2)
+  technicalFileSignaturePosition  String @default("right") // Position of single signature on page (right, left, middle)
+  technicalFileSignatureLineWidth Int    @default(150) // Width of signature line above label in pixels
+
+  // Individual signature controls
+  technicalFileIncludeLeftSignature Boolean @default(true) // Show left signature
+  technicalFileLeftSignatureOffsetX Int     @default(0) // Horizontal offset in pixels (positive = right, negative = left)
+  technicalFileLeftSignatureOffsetY Int     @default(0) // Vertical offset in pixels (positive = up, negative = down)
+
+  technicalFileIncludeRightSignature Boolean @default(true) // Show right signature
+  technicalFileRightSignatureOffsetX Int     @default(0) // Horizontal offset in pixels (positive = right, negative = left)
+  technicalFileRightSignatureOffsetY Int     @default(0) // Vertical offset in pixels (positive = up, negative = down)
+
+  // Page number (dynamic, fixed at bottom center)
+  technicalFilePageNumberingText    String        @default("Page 1 sur 1") // Configurable page numbering format
+  technicalFilePageNumberFontFamily PDFFontFamily @default(HELVETICA)
+  technicalFilePageNumberFontSize   Int           @default(10)
+  technicalFilePageNumberTextColor  String        @default("#666")
+  technicalFilePageNumberPosition   String        @default("center")
+  technicalFilePageNumberOffsetX    Int           @default(0)
+  technicalFilePageNumberOffsetY    Int           @default(0)
+
+  // Technical file currency and language
+  technicalFileCurrency String @default("DZD") // Currency for technical file display (DZD, EUR, USD, etc.)
+  technicalFileLanguage String @default("FR") // Language for technical file content (FR, EN, AR)
+
+  // =====================
+  // DELIVERY NOTE SETTINGS
+  // =====================
+
+  // Delivery Note Top Body Part (Title, Client Info, Date)
+  deliveryNoteTopBodyDirection String @default("LTR") // LTR or RTL for top body section
+
+  // Title settings
+  deliveryNoteTitlePosition      String        @default("center") // left, center, right
+  deliveryNoteTitleFontFamily    PDFFontFamily @default(HELVETICA)
+  deliveryNoteTitleFontSize      Int           @default(16)
+  deliveryNoteTitleTextColor     String        @default("#000000")
+  deliveryNoteTitleLineSpacing   Float         @default(0.5)
+  deliveryNoteTitleLetterSpacing Float         @default(0.0)
+  deliveryNoteTitleBold          Boolean       @default(true)
+  deliveryNoteTitleUnderline     Boolean       @default(false)
+
+  // Customer info settings
+  deliveryNoteClientInfoPosition       String        @default("left") // left, center, right
+  deliveryNoteClientLabelText          String        @default("Client")
+  // Customer info settings - Label
+  deliveryNoteClientLabelFontFamily    PDFFontFamily @default(HELVETICA)
+  deliveryNoteClientLabelFontSize      Int           @default(12)
+  deliveryNoteClientLabelTextColor     String        @default("#000000")
+  deliveryNoteClientLabelLineSpacing   Float         @default(0.5)
+  deliveryNoteClientLabelLetterSpacing Float         @default(0.0)
+  deliveryNoteClientLabelBold          Boolean       @default(true)
+  deliveryNoteClientLabelUnderline     Boolean       @default(false)
+
+  // Customer info settings - Value
+  deliveryNoteClientValueFontFamily    PDFFontFamily @default(HELVETICA)
+  deliveryNoteClientValueFontSize      Int           @default(12)
+  deliveryNoteClientValueTextColor     String        @default("#000000")
+  deliveryNoteClientValueLineSpacing   Float         @default(0.5)
+  deliveryNoteClientValueLetterSpacing Float         @default(0.0)
+  deliveryNoteClientValueBold          Boolean       @default(false)
+  deliveryNoteClientValueUnderline     Boolean       @default(false)
+
+  // Date/location settings
+  deliveryNoteDatePosition          String        @default("right") // left, center, right
+  deliveryNoteLocationDateLabelText String        @default("M'sila le") // Configurable label
+  deliveryNoteDateFontFamily        PDFFontFamily @default(HELVETICA)
+  deliveryNoteDateFontSize          Int           @default(12)
+  deliveryNoteDateTextColor         String        @default("#000000")
+  deliveryNoteDateLineSpacing       Float         @default(0.5)
+  deliveryNoteDateLetterSpacing     Float         @default(0.0)
+  deliveryNoteDateBold              Boolean       @default(false)
+  deliveryNoteDateUnderline         Boolean       @default(false)
+
+  // Delivery Note Items Table
+  deliveryNoteTableTextAlignment String @default("left") // left, center, right
+  deliveryNoteTableDirection     String @default("LTR") // LTR or RTL for items table
+
+  // Table labels (header row) settings
+  deliveryNoteTableLabelFontFamily    PDFFontFamily @default(HELVETICA)
+  deliveryNoteTableLabelFontSize      Int           @default(11)
+  deliveryNoteTableLabelTextColor     String        @default("#000000")
+  deliveryNoteTableLabelLineSpacing   Float         @default(1)
+  deliveryNoteTableLabelLetterSpacing Float         @default(0.0)
+  deliveryNoteTableLabelBold          Boolean       @default(true)
+  deliveryNoteTableLabelUnderline     Boolean       @default(false)
+
+  // Table values (rest of table) settings
+  deliveryNoteTableValueFontFamily    PDFFontFamily @default(HELVETICA)
+  deliveryNoteTableValueFontSize      Int           @default(11)
+  deliveryNoteTableValueTextColor     String        @default("#000000")
+  deliveryNoteTableValueLineSpacing   Float         @default(1)
+  deliveryNoteTableValueLetterSpacing Float         @default(0.0)
+  deliveryNoteTableValueBold          Boolean       @default(false)
+  deliveryNoteTableValueUnderline     Boolean       @default(false)
+
+  deliveryNoteEmptyRows Int @default(8) // Number of empty rows to show
+
+  // Items Table Max Height Settings
+  deliveryNoteSinglePageTableMaxHeight Int @default(297) // Max height of items table on single page (mm)
+  deliveryNoteLastPageTableMaxHeight   Int @default(150) // Max height of items table on last page (mm)
+  deliveryNoteOtherPagesTableMaxHeight Int @default(180) // Max height of items table on other pages (mm)
+  deliveryNoteFirstPageTableMaxHeight  Int @default(180) // Max height of items table on first page (mm) - with header and customer info
+
+  // Column-specific settings for items table
+  deliveryNoteColNumberWidth   Float @default(5) // Column width in mm
+  deliveryNoteColNumberPadding Float @default(2) // Cell padding in mm
+
+  deliveryNoteColFamilyWidth   Float @default(39.69) // Column width in mm
+  deliveryNoteColFamilyPadding Float @default(5.61) // Cell padding in mm
+
+  deliveryNoteColModelWidth   Float @default(39.69) // Column width in mm
+  deliveryNoteColModelPadding Float @default(5.61) // Cell padding in mm
+
+  deliveryNoteColBrandWidth   Float @default(20) // Column width in mm
+  deliveryNoteColBrandPadding Float @default(5.61) // Cell padding in mm
+
+  deliveryNoteColQuantityWidth   Float @default(21.17) // Column width in mm
+  deliveryNoteColQuantityPadding Float @default(5.61) // Cell padding in mm
+
+  deliveryNoteColPriceUnitWidth   Float @default(31.75) // Column width in mm
+  deliveryNoteColPriceUnitPadding Float @default(5.61) // Cell padding in mm
+
+  deliveryNoteColPriceTotalWidth   Float @default(31.75) // Column width in mm
+  deliveryNoteColPriceTotalPadding Float @default(5.61) // Cell padding in mm
+
+  // Delivery Note Totals Section (uses same fonts as table values)
+
+  // Delivery Note Footer (Terms & Conditions)
+  deliveryNoteTermsPosition      String        @default("left") // left, center, right
+  deliveryNoteTermsTitle         String        @default("") // Configurable title
+  deliveryNoteTermsFontFamily    PDFFontFamily @default(HELVETICA)
+  deliveryNoteTermsFontSize      Int           @default(11)
+  deliveryNoteTermsTextColor     String        @default("#000000")
+  deliveryNoteTermsLineSpacing   Float         @default(0.5)
+  deliveryNoteTermsLetterSpacing Float         @default(0.0)
+  deliveryNoteTermsBold          Boolean       @default(false)
+  deliveryNoteTermsUnderline     Boolean       @default(false)
+
+  // Individual Terms Settings
+  deliveryNoteTermsIncludeDelivery  Boolean @default(true) // Include delivery term
+  deliveryNoteTermsDeliveryType     String  @default("range") // "fixed" or "range"
+  deliveryNoteTermsDeliveryTimeFrom Int     @default(1) // For range: minimum time
+  deliveryNoteTermsDeliveryTimeTo   Int? // For range: maximum time (null if fixed)
+  deliveryNoteTermsDeliveryTimeUnit String  @default("months") // "days", "weeks", "months", "years"
+
+  deliveryNoteTermsIncludeValidity  Boolean @default(true) // Include validity term
+  deliveryNoteTermsValidityType     String  @default("fixed") // "fixed" or "range"
+  deliveryNoteTermsValidityTime     Int     @default(3) // Time value
+  deliveryNoteTermsValidityTimeTo   Int? // For range: maximum time (null if fixed)
+  deliveryNoteTermsValidityTimeUnit String  @default("months") // "days", "weeks", "months", "years"
+
+  deliveryNoteTermsIncludeWarranty  Boolean @default(true) // Include warranty term
+  deliveryNoteTermsWarrantyType     String  @default("fixed") // "fixed" or "range"
+  deliveryNoteTermsWarrantyTime     Int     @default(12) // Time value
+  deliveryNoteTermsWarrantyTimeTo   Int? // For range: maximum time (null if fixed)
+  deliveryNoteTermsWarrantyTimeUnit String  @default("months") // "days", "weeks", "months", "years"
+
+  deliveryNoteTermsIncludeConfirmation Boolean @default(false) // Include delivery confirmation term
+  deliveryNoteTermsDeliveryCondition   String  @default("after_order_confirmation") // "after_order_confirmation" or "after_payment"
+
+  deliveryNoteTermsIncludePayment      Boolean @default(true) // Include payment method term
+  deliveryNoteTermsPaymentMethod       String  @default("split_payment") // "online", "website", "check", "cash", "split_payment"
+  deliveryNoteTermsSplitPaymentPercent Int     @default(50) // Percentage to pay at order (for split payment)
+  deliveryNoteTermsIncludePriceInWords Boolean @default(true) // Include total price in words
+
+  // Signature labels (position is fixed at bottom, before page number)
+  deliveryNoteSignatureLeftLabelText  String @default("Manager") // Configurable left signature label
+  deliveryNoteSignatureRightLabelText String @default("Client") // Configurable right signature label
+
+  // Signature configuration
+  deliveryNoteSignatureCount     Int    @default(2) // Number of signatures to show (1 or 2)
+  deliveryNoteSignaturePosition  String @default("right") // Position of single signature on page (right, left, middle)
+  deliveryNoteSignatureLineWidth Int    @default(150) // Width of signature line above label in pixels
+
+  // Individual signature controls
+  deliveryNoteIncludeLeftSignature Boolean @default(true) // Show left signature
+  deliveryNoteLeftSignatureOffsetX Int     @default(0) // Horizontal offset in pixels (positive = right, negative = left)
+  deliveryNoteLeftSignatureOffsetY Int     @default(0) // Vertical offset in pixels (positive = up, negative = down)
+
+  deliveryNoteIncludeRightSignature Boolean @default(true) // Show right signature
+  deliveryNoteRightSignatureOffsetX Int     @default(0) // Horizontal offset in pixels (positive = right, negative = left)
+  deliveryNoteRightSignatureOffsetY Int     @default(0) // Vertical offset in pixels (positive = up, negative = down)
+
+  // Page number (dynamic, fixed at bottom center)
+  deliveryNotePageNumberingText    String        @default("Page 1 sur 1") // Configurable page numbering format
+  deliveryNotePageNumberFontFamily PDFFontFamily @default(HELVETICA)
+  deliveryNotePageNumberFontSize   Int           @default(10)
+  deliveryNotePageNumberTextColor  String        @default("#666")
+  deliveryNotePageNumberPosition   String        @default("center")
+  deliveryNotePageNumberOffsetX    Int           @default(0)
+  deliveryNotePageNumberOffsetY    Int           @default(0)
+
+  // Delivery Note currency and language
+  deliveryNoteCurrency String @default("DZD") // Currency for delivery note display (DZD, EUR, USD, etc.)
+  deliveryNoteLanguage String @default("FR") // Language for delivery note content (FR, EN, AR)
+
+  // =====================
+  // PURCHASE ORDER SETTINGS
+  // =====================
+
+  // Purchase Order Top Body Part (Title, Client Info, Date)
+  purchaseOrderTopBodyDirection String @default("LTR") // LTR or RTL for top body section
+
+  // Title settings
+  purchaseOrderTitlePosition      String        @default("center") // left, center, right
+  purchaseOrderTitleFontFamily    PDFFontFamily @default(HELVETICA)
+  purchaseOrderTitleFontSize      Int           @default(16)
+  purchaseOrderTitleTextColor     String        @default("#000000")
+  purchaseOrderTitleLineSpacing   Float         @default(0.5)
+  purchaseOrderTitleLetterSpacing Float         @default(0.0)
+  purchaseOrderTitleBold          Boolean       @default(true)
+  purchaseOrderTitleUnderline     Boolean       @default(false)
+
+  // Customer info settings
+  purchaseOrderClientInfoPosition       String        @default("left") // left, center, right
+  purchaseOrderClientLabelText          String        @default("Supplier")
+  // Customer info settings - Label
+  purchaseOrderClientLabelFontFamily    PDFFontFamily @default(HELVETICA)
+  purchaseOrderClientLabelFontSize      Int           @default(12)
+  purchaseOrderClientLabelTextColor     String        @default("#000000")
+  purchaseOrderClientLabelLineSpacing   Float         @default(0.5)
+  purchaseOrderClientLabelLetterSpacing Float         @default(0.0)
+  purchaseOrderClientLabelBold          Boolean       @default(true)
+  purchaseOrderClientLabelUnderline     Boolean       @default(false)
+
+  // Customer info settings - Value
+  purchaseOrderClientValueFontFamily    PDFFontFamily @default(HELVETICA)
+  purchaseOrderClientValueFontSize      Int           @default(12)
+  purchaseOrderClientValueTextColor     String        @default("#000000")
+  purchaseOrderClientValueLineSpacing   Float         @default(0.5)
+  purchaseOrderClientValueLetterSpacing Float         @default(0.0)
+  purchaseOrderClientValueBold          Boolean       @default(false)
+  purchaseOrderClientValueUnderline     Boolean       @default(false)
+
+  // Date/location settings
+  purchaseOrderDatePosition          String        @default("right") // left, center, right
+  purchaseOrderLocationDateLabelText String        @default("M'sila le") // Configurable label
+  purchaseOrderDateFontFamily        PDFFontFamily @default(HELVETICA)
+  purchaseOrderDateFontSize          Int           @default(12)
+  purchaseOrderDateTextColor         String        @default("#000000")
+  purchaseOrderDateLineSpacing       Float         @default(0.5)
+  purchaseOrderDateLetterSpacing     Float         @default(0.0)
+  purchaseOrderDateBold              Boolean       @default(false)
+  purchaseOrderDateUnderline         Boolean       @default(false)
+
+  // Purchase Order Items Table
+  purchaseOrderTableTextAlignment String @default("left") // left, center, right
+  purchaseOrderTableDirection     String @default("LTR") // LTR or RTL for items table
+
+  // Table labels (header row) settings
+  purchaseOrderTableLabelFontFamily    PDFFontFamily @default(HELVETICA)
+  purchaseOrderTableLabelFontSize      Int           @default(11)
+  purchaseOrderTableLabelTextColor     String        @default("#000000")
+  purchaseOrderTableLabelLineSpacing   Float         @default(1)
+  purchaseOrderTableLabelLetterSpacing Float         @default(0.0)
+  purchaseOrderTableLabelBold          Boolean       @default(true)
+  purchaseOrderTableLabelUnderline     Boolean       @default(false)
+
+  // Table values (rest of table) settings
+  purchaseOrderTableValueFontFamily    PDFFontFamily @default(HELVETICA)
+  purchaseOrderTableValueFontSize      Int           @default(11)
+  purchaseOrderTableValueTextColor     String        @default("#000000")
+  purchaseOrderTableValueLineSpacing   Float         @default(1)
+  purchaseOrderTableValueLetterSpacing Float         @default(0.0)
+  purchaseOrderTableValueBold          Boolean       @default(false)
+  purchaseOrderTableValueUnderline     Boolean       @default(false)
+
+  purchaseOrderEmptyRows Int @default(8) // Number of empty rows to show
+
+  // Items Table Max Height Settings
+  purchaseOrderSinglePageTableMaxHeight Int @default(297) // Max height of items table on single page (mm)
+  purchaseOrderLastPageTableMaxHeight   Int @default(150) // Max height of items table on last page (mm)
+  purchaseOrderOtherPagesTableMaxHeight Int @default(180) // Max height of items table on other pages (mm)
+  purchaseOrderFirstPageTableMaxHeight  Int @default(180) // Max height of items table on first page (mm) - with header and customer info
+
+  // Column-specific settings for items table
+  purchaseOrderColNumberWidth   Float @default(5) // Column width in mm
+  purchaseOrderColNumberPadding Float @default(2) // Cell padding in mm
+
+  purchaseOrderColFamilyWidth   Float @default(39.69) // Column width in mm
+  purchaseOrderColFamilyPadding Float @default(5.61) // Cell padding in mm
+
+  purchaseOrderColModelWidth   Float @default(39.69) // Column width in mm
+  purchaseOrderColModelPadding Float @default(5.61) // Cell padding in mm
+
+  purchaseOrderColBrandWidth   Float @default(20) // Column width in mm
+  purchaseOrderColBrandPadding Float @default(5.61) // Cell padding in mm
+
+  purchaseOrderColQuantityWidth   Float @default(21.17) // Column width in mm
+  purchaseOrderColQuantityPadding Float @default(5.61) // Cell padding in mm
+
+  purchaseOrderColPriceUnitWidth   Float @default(31.75) // Column width in mm
+  purchaseOrderColPriceUnitPadding Float @default(5.61) // Cell padding in mm
+
+  purchaseOrderColPriceTotalWidth   Float @default(31.75) // Column width in mm
+  purchaseOrderColPriceTotalPadding Float @default(5.61) // Cell padding in mm
+
+  // Purchase Order Totals Section (uses same fonts as table values)
+
+  // Purchase Order Footer (Terms & Conditions)
+  purchaseOrderTermsPosition      String        @default("left") // left, center, right
+  purchaseOrderTermsTitle         String        @default("") // Configurable title
+  purchaseOrderTermsFontFamily    PDFFontFamily @default(HELVETICA)
+  purchaseOrderTermsFontSize      Int           @default(11)
+  purchaseOrderTermsTextColor     String        @default("#000000")
+  purchaseOrderTermsLineSpacing   Float         @default(0.5)
+  purchaseOrderTermsLetterSpacing Float         @default(0.0)
+  purchaseOrderTermsBold          Boolean       @default(false)
+  purchaseOrderTermsUnderline     Boolean       @default(false)
+
+  // Individual Terms Settings
+  purchaseOrderTermsIncludeDelivery  Boolean @default(true) // Include delivery term
+  purchaseOrderTermsDeliveryType     String  @default("range") // "fixed" or "range"
+  purchaseOrderTermsDeliveryTimeFrom Int     @default(1) // For range: minimum time
+  purchaseOrderTermsDeliveryTimeTo   Int? // For range: maximum time (null if fixed)
+  purchaseOrderTermsDeliveryTimeUnit String  @default("months") // "days", "weeks", "months", "years"
+
+  purchaseOrderTermsIncludeValidity  Boolean @default(true) // Include validity term
+  purchaseOrderTermsValidityType     String  @default("fixed") // "fixed" or "range"
+  purchaseOrderTermsValidityTime     Int     @default(3) // Time value
+  purchaseOrderTermsValidityTimeTo   Int? // For range: maximum time (null if fixed)
+  purchaseOrderTermsValidityTimeUnit String  @default("months") // "days", "weeks", "months", "years"
+
+  purchaseOrderTermsIncludeWarranty  Boolean @default(true) // Include warranty term
+  purchaseOrderTermsWarrantyType     String  @default("fixed") // "fixed" or "range"
+  purchaseOrderTermsWarrantyTime     Int     @default(12) // Time value
+  purchaseOrderTermsWarrantyTimeTo   Int? // For range: maximum time (null if fixed)
+  purchaseOrderTermsWarrantyTimeUnit String  @default("months") // "days", "weeks", "months", "years"
+
+  purchaseOrderTermsIncludeConfirmation Boolean @default(false) // Include delivery confirmation term
+  purchaseOrderTermsDeliveryCondition   String  @default("after_order_confirmation") // "after_order_confirmation" or "after_payment"
+
+  purchaseOrderTermsIncludePayment      Boolean @default(true) // Include payment method term
+  purchaseOrderTermsPaymentMethod       String  @default("split_payment") // "online", "website", "check", "cash", "split_payment"
+  purchaseOrderTermsSplitPaymentPercent Int     @default(50) // Percentage to pay at order (for split payment)
+  purchaseOrderTermsIncludePriceInWords Boolean @default(true) // Include total price in words
+
+  // Signature labels (position is fixed at bottom, before page number)
+  purchaseOrderSignatureLeftLabelText  String @default("Manager") // Configurable left signature label
+  purchaseOrderSignatureRightLabelText String @default("Supplier") // Configurable right signature label
+
+  // Signature configuration
+  purchaseOrderSignatureCount     Int    @default(2) // Number of signatures to show (1 or 2)
+  purchaseOrderSignaturePosition  String @default("right") // Position of single signature on page (right, left, middle)
+  purchaseOrderSignatureLineWidth Int    @default(150) // Width of signature line above label in pixels
+
+  // Individual signature controls
+  purchaseOrderIncludeLeftSignature Boolean @default(true) // Show left signature
+  purchaseOrderLeftSignatureOffsetX Int     @default(0) // Horizontal offset in pixels (positive = right, negative = left)
+  purchaseOrderLeftSignatureOffsetY Int     @default(0) // Vertical offset in pixels (positive = up, negative = down)
+
+  purchaseOrderIncludeRightSignature Boolean @default(true) // Show right signature
+  purchaseOrderRightSignatureOffsetX Int     @default(0) // Horizontal offset in pixels (positive = right, negative = left)
+  purchaseOrderRightSignatureOffsetY Int     @default(0) // Vertical offset in pixels (positive = up, negative = down)
+
+  // Page number (dynamic, fixed at bottom center)
+  purchaseOrderPageNumberingText    String        @default("Page 1 sur 1") // Configurable page numbering format
+  purchaseOrderPageNumberFontFamily PDFFontFamily @default(HELVETICA)
+  purchaseOrderPageNumberFontSize   Int           @default(10)
+  purchaseOrderPageNumberTextColor  String        @default("#666")
+  purchaseOrderPageNumberPosition   String        @default("center")
+  purchaseOrderPageNumberOffsetX    Int           @default(0)
+  purchaseOrderPageNumberOffsetY    Int           @default(0)
+
+  // Purchase Order currency and language
+  purchaseOrderCurrency String @default("DZD") // Currency for purchase order display (DZD, EUR, USD, etc.)
+  purchaseOrderLanguage String @default("FR") // Language for purchase order content (FR, EN, AR)
+
+  // Margins
+  pageBorderMargin       Int @default(40) // Margin around page content border (pixels)
+  headerSectionMargin    Int @default(0) // Margin after header section (pixels)
+  factureNumberMargin    Int @default(0) // Margin after invoice/proforma/purchase order number (pixels)
+  clientInfoMargin       Int @default(5) // Margin after client info section (pixels)
+  dateMargin             Int @default(5) // Margin after date/location section (pixels)
+  itemTableMargin        Int @default(5) // Margin after items table section (pixels)
+  summaryTableMargin     Int @default(5) // Margin after summary table section (pixels)
+  termsSectionMargin     Int @default(5) // Margin after terms section (pixels)
+  signatureSectionMargin Int @default(10) // Margin after signatures section (pixels)
+  pageNumberMargin       Int @default(5) // Margin before page number (pixels)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ============================================
+// FILE TYPES (documents attached to orders)
+// ============================================
+enum FileType {
+  INVOICE
+  PROFORMA
+  PURCHASE_ORDER
+  DELIVERY_NOTE
+  TECHNICAL_FILE
+  NAMEPLATE
+}
+
+// ============================================
+// FILE STATUS
+// ============================================
+enum FileStatus {
+  DRAFT
+  READY
+  ERROR
+}
+
+// ============================================
+// FILE SEQUENCE (per file type + year)
+// ============================================
+model FileSequence {
+  id        String   @id @default(cuid())
+  fileType  FileType
+  year      Int
+  sequence  Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([fileType, year])
+  @@index([fileType, year])
+}
+
+// ============================================
+// FILE REVISIONS (versioning for edited files)
+// ============================================
+model FileRevision {
+  id              String   @id @default(cuid())
+  fileId          String
+  revisionNumber  Int
+  pdfPath         String
+  templateVersion Json // Snapshot of template used
+  changes         String? // JSON description of changes
+  createdBy       String?
+  createdAt       DateTime @default(now())
+
+  file File @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  @@unique([fileId, revisionNumber])
+  @@index([fileId])
+}
+
+// ============================================
+// FILES (documents: invoice, proforma, PO, etc.)
+// ============================================
+model File {
+  id              String     @id @default(cuid())
+  orderId         String
+  fileType        FileType
+  numberYear      Int
+  numberSequence  Int
+  fullNumber      String
+  fileDate        DateTime
+  status          FileStatus @default(DRAFT)
+  pdfPath         String?
+  templateVersion Json // Snapshot of template version used
+  notes           String?
+  deletedAt       DateTime?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  order     Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  revisions FileRevision[]
+
+  @@unique([numberYear, numberSequence, fileType, deletedAt])
+  @@index([orderId])
+  @@index([fileType])
+  @@index([numberYear, numberSequence])
+  @@index([deletedAt])
+}
+
+// ============================================
+// ORDERS
+// ============================================
+model Order {
+  id                 String      @id @default(cuid())
+  type               OrderType
+  orderNumber        Int? // Foreign key reference to OrderNumber.number (nullable until committed)
+  numberYear         Int // 2026
+  numberSequence     Int // 3 (for 003/2026)
+  fullNumber         String // Computed: 003/2026
+  customerId         String
+  customerName       String // Denormalized for PDF
+  date               DateTime
+  dueDate            DateTime?
+  status             OrderStatus @default(DRAFT)
+  currency           String      @default("EUR")
+  subtotal           Float       @default(0)
+  taxRate            Float       @default(0)
+  taxAmount          Float       @default(0)
+  total              Float       @default(0)
+  notes              String?
+  pdfPath            String? // Path to generated PDF
+  documentLanguage   String      @default("fr") // ar, en, fr for document body
+  activityProfileId   String? // ID of the selected activity profile for this order
+  payments           String? // JSON array of payment records
+  deletedAt          DateTime?
+  numberReuseAllowed Boolean     @default(false) // User choice when deleting: allow number reuse
+
+  // Split document tracking
+  parentId           String? // If this is a split, points to the original order ID
+  splitOfDocumentType String? // Which document type was split (invoice, proforma, purchase-order, delivery-note)
+  splitIndex         Int? // Which split this is (1, 2, 3, etc.)
+
+  // Invoice fields (independent numbering)
+  invoiceNumber     Int? // Foreign key reference to InvoiceNumbers
+  invoiceYear       Int? // Invoice year
+  invoiceSequence   Int? // Invoice sequence number
+  invoiceFullNumber String? // Computed: INV-001/2026
+  invoiceDate       DateTime? // Invoice date (can be different from order date)
+  invoiceStatus     String? // Invoice status: DRAFT, ISSUED, PAID, CANCELLED
+
+  // Proforma fields (independent numbering)
+  proformaNumber     Int? // Foreign key reference to ProformaNumbers
+  proformaYear       Int? // Proforma year
+  proformaSequence   Int? // Proforma sequence number
+  proformaFullNumber String? // Computed: PRO-001/2026
+  proformaDate       DateTime? // Proforma date (can be different from order date)
+  proformaStatus     String? // Proforma status: DRAFT, ISSUED, CANCELLED
+
+  // Purchase Order fields (independent numbering)
+  purchaseOrderNumber     Int? // Foreign key reference to PurchaseOrderNumbers
+  purchaseOrderYear       Int? // Purchase Order year
+  purchaseOrderSequence   Int? // Purchase Order sequence number
+  purchaseOrderFullNumber String? // Computed: PO-001/2026
+  purchaseOrderDate       DateTime? // Purchase Order date (can be different from order date)
+  purchaseOrderStatus     String? // Purchase Order status: DRAFT, ISSUED, CANCELLED
+
+  // Snapshot fields for invoice/proforma/purchase order preview (stored at order creation)
+  snapshotCompany   String? // JSON: Company data snapshot
+  snapshotCustomer  String? // JSON: Customer data snapshot  
+  snapshotPdfConfig String? // JSON: PDF configuration snapshot
+
+  // Verification token for QR code
+  invoiceVerificationToken       String? // Verification token linked to invoice
+  proformaVerificationToken      String? // Verification token linked to proforma
+  purchaseOrderVerificationToken String? // Verification token linked to purchase order
+
+  // Delivery Note fields (independent numbering)
+  deliveryNoteNumber            Int? // Foreign key reference to DeliveryNumbers
+  deliveryNoteYear              Int? // Delivery Note year
+  deliveryNoteSequence          Int? // Delivery Note sequence number
+  deliveryNoteFullNumber        String? // Computed: DN-001/2026
+  deliveryNoteDate              DateTime? // Delivery Note date (can be different from order date)
+  deliveryNoteStatus            String? // Delivery Note status: DRAFT, ISSUED, CANCELLED
+  deliveryNoteVerificationToken String? // Verification token linked to delivery note
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  customer  Customer        @relation(fields: [customerId], references: [id])
+  items     OrderItem[]
+  auditLogs AuditLog[]
+  files     File[]
+  numberRef OrderNumber?    @relation(fields: [orderNumber], references: [number])
+  splits    DocumentSplit[] // All document splits for this order
+
+  @@unique([orderNumber, deletedAt]) // Ensure no two active orders share the same number
+  @@unique([numberYear, numberSequence, deletedAt])
+  @@index([orderNumber])
+  @@index([numberYear, numberSequence])
+  @@index([customerId])
+  @@index([status])
+  @@index([deletedAt])
+  @@index([parentId]) // Index for finding split documents
+  @@index([parentId, splitOfDocumentType]) // Composite index for split documents
+  @@index([invoiceNumber])
+  @@index([invoiceYear, invoiceSequence])
+  @@index([invoiceStatus])
+  @@index([invoiceVerificationToken])
+  @@index([proformaNumber])
+  @@index([proformaYear, proformaSequence])
+  @@index([proformaStatus])
+  @@index([proformaVerificationToken])
+  @@index([purchaseOrderNumber])
+  @@index([purchaseOrderYear, purchaseOrderSequence])
+  @@index([purchaseOrderStatus])
+  @@index([purchaseOrderVerificationToken])
+  @@index([deliveryNoteNumber])
+  @@index([deliveryNoteYear, deliveryNoteSequence])
+  @@index([deliveryNoteStatus])
+  @@index([deliveryNoteVerificationToken])
+}
+
+// ============================================
+// QR CODE SETTINGS
+// ============================================
+model QRCodeSettings {
+  id        String   @id @default(cuid())
+  config    String // JSON string of QRCodeConfig
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ============================================
+// VERIFICATION TOKENS
+// ============================================
+model VerificationToken {
+  id         String   @id @default(cuid())
+  token      String   @unique // The HMAC verification token
+  qrJsonData String // The full JSON data that was used to generate the QR code
+  label      String? // Optional label (e.g., "test" for test tokens)
+  createdAt  DateTime @default(now())
+
+  @@index([token])
+  @@index([label])
+}
+
+// ============================================
+// BACKUP SYSTEM
+// ============================================
+model Backup {
+  id           String    @id @default(cuid())
+  filename     String    // Generated filename for the backup file
+  description  String?   // User-provided description
+  fileSize     Int       // File size in bytes
+  dataTypes    String    // JSON array of included data types
+  dateFrom     DateTime? // Start date for filtered backup (optional)
+  dateTo       DateTime? // End date for filtered backup (optional)
+  status       String    @default("completed") // completed, failed, partial
+  errorMessage String?   // Error message if failed
+  recordCount  Int       @default(0) // Total number of records backed up
+  createdBy    String?   // User who created backup (for future use)
+  createdAt    DateTime  @default(now())
+
+  @@index([createdAt])
+  @@index([status])
+}

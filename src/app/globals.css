@@ -1,0 +1,110 @@
+@import "tailwindcss";
+
+:root {
+  --radius: 0.625rem;
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --background: 0 0% 100%;
+  --foreground: 0 0% 9%;
+  --card: 0 0% 100%;
+  --card-foreground: 0 0% 9%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 0 0% 9%;
+  --primary: 0 0% 9%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 210 40% 96%;
+  --secondary-foreground: 0 0% 9%;
+  --muted: 210 40% 96%;
+  --muted-foreground: 215 16% 47%;
+  --accent: 210 40% 96%;
+  --accent-foreground: 0 0% 9%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 214 32% 91%;
+  --input: 214 32% 91%;
+  --ring: 217 91% 60%;
+}
+
+.dark {
+  --background: 0 0% 9%;
+  --foreground: 0 0% 100%;
+  --card: 0 0% 9%;
+  --card-foreground: 0 0% 100%;
+  --popover: 0 0% 9%;
+  --popover-foreground: 0 0% 100%;
+  --primary: 0 0% 98%;
+  --primary-foreground: 0 0% 9%;
+  --secondary: 210 40% 96%;
+  --secondary-foreground: 0 0% 100%;
+  --muted: 210 40% 96%;
+  --muted-foreground: 217 11% 45%;
+  --accent: 210 40% 96%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 0 62% 30%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 217 33% 17%;
+  --input: 217 33% 10%;
+  --ring: 217 91% 60%;
+}
+
+.dark html {
+  color-scheme: dark;
+}
+
+html:not(.dark) {
+  color-scheme: light;
+}
+
+@layer base {
+  * {
+    border-color: hsl(var(--border));
+  }
+  body {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Fix for dropdown/select in dark mode */
+  select {
+    color-scheme: light;
+  }
+
+  select option {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+  }
+
+  /* Ensure dialog backgrounds are opaque */
+  [data-slot="alert-dialog-content"],
+  [data-slot="dialog-content"] {
+    background-color: hsl(var(--background));
+  }
+
+  /* Ensure select dropdown backgrounds are opaque in both modes */
+  [data-slot="select-content"] {
+    background-color: hsl(var(--background)) !important;
+  }
+  .dark [data-slot="select-content"] {
+    background-color: hsl(var(--card)) !important;
+  }
+
+  /* Ensure select scroll buttons have proper background */
+  [data-slot="select-scroll-up-button"],
+  [data-slot="select-scroll-down-button"] {
+    background-color: hsl(var(--background)) !important;
+  }
+  .dark [data-slot="select-scroll-up-button"],
+  .dark [data-slot="select-scroll-down-button"] {
+    background-color: hsl(var(--card)) !important;
+  }
+
+  /* Ensure select items have proper text color */
+  [data-slot="select-item"] {
+    color: hsl(var(--foreground)) !important;
+  }
+  .dark [data-slot="select-item"] {
+    color: hsl(var(--card-foreground)) !important;
+  }
+}

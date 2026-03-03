@@ -1,0 +1,12 @@
+{
+  "name": "story-video-generation",
+  "version": "1.0.0",
+  "description": "Story video generation with automatic image generation",
+  "type": "module",
+  "scripts": {
+    "generate-image": "node scripts/generate-image.js"
+  },
+  "dependencies": {
+    "z-ai-web-dev-sdk": "*"
+  }
+}
